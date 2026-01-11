@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>hitMetrics</title>
+  <link rel="icon" type="image/x-icon" href="images/RafaelLogo.ico">
+  <link rel="stylesheet" href="style.css">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NTRFQRJZN9"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NTRFQRJZN9');
+  </script>
+</head>
+<body>
+<header class="app-header">
+  <div class="header-left">
+    <img src="images/RafLogo.svg" alt="Rafael Logo" class="rafael-logo" onclick="playRafaelTune()" />
+  </div>
+  <div class="header-center">
+    <div class="header-center-title-row">
+      <h1>🎯 Shooting Dispersion Analyzer</h1>
+      <div class="stage">
+        <span class="pill on" id="pillScale">1) Set scale</span>
+        <span class="pill" id="pillAim">2) Aim point</span>
+        <span class="pill" id="pillHits">3) Mark hits</span>
+      </div>
+    </div>
+    <div class="hint">
+      Tip: <span class="kbd">Ctrl</span>+Click in hit stage to undo last hit.
+      <span class="kbd">S</span> cycles stages (when allowed).
+    </div>
+  </div>
+  <div class="header-right">
+    <img src="images/logo-title.svg" alt="Blau Robotics Logo" class="blau-logo" onclick="about()" />
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h2>Load target image</h2>
+    <div class="row">
+      <input id="file" type="file" accept="image/*" />
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Hit/overlay color</label>
+        <input id="hitColor" type="color" value="#ff0000" />
+      </div>
+      <div class="field">
+        <label>Overlay opacity</label>
+        <input id="hitAlpha" type="number" min="0.1" max="1.0" step="0.05" value="0.95" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Stage 1 — Set scale (mRad / pixel)</h2>
+    <div class="hint">
+      Click <b>two points</b> on the picture, then enter the distance between them and the range.
+      This sets <b>mRad per pixel</b>.
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>distance between 2 points [m]</label>
+        <input id="realDistM" type="number" min="0" step="0.001" value="1.000" />
+      </div>
+      <div class="field">
+        <label>Range to target [m]</label>
+        <input id="rangeM" type="number" min="0" step="1" value="1000" />
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="setScaleBtn" disabled>Compute scale</button>
+      <button id="resetScaleBtn" disabled>Reset scale points</button>
+      <button id="toAimBtn" disabled>Go to aim point</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Stage 2 — Choose aim point</h2>
+    <div class="hint">
+      Click once on the image to set the <b>aim point</b>.
+      The app draws an <b>arrow</b> from Aim → Center (after you have hits).
+    </div>
+
+    <div class="row">
+      <button id="resetAimBtn" disabled>Reset aim point</button>
+      <button id="toHitsBtn" disabled class="primary">Go to hit marking</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Stage 3 — Mark hits</h2>
+    <div class="hint">
+      Click to add hits. The app computes:
+      <ul>
+        <li>Center of hits (mean X/Y)</li>
+        <li><b>Blocking circle radius</b> (max distance of a hit from the center)</li>
+        <li><b>STD TR</b> (std of X deviations) and <b>STD EL</b> (std of Y deviations)</li>
+        <li><b>Aim offset</b>: Aim → Center distance</li>
+      </ul>
+    </div>
+
+    <div class="row">
+      <button id="clearHitsBtn" class="danger" disabled>Clear hits</button>
+      <button id="undoHitBtn" disabled>Undo last hit</button>
+      <button id="exportBtn" disabled>Export annotated PNG</button>
+      <button id="exportCsvBtn" disabled>Export to CSV</button>
+    </div>
+
+    <div class="stats">
+      <div class="card">
+        <div class="k">Scale</div>
+        <div class="v mono" id="scaleOut">—</div>
+        <div class="small">mRad per pixel</div>
+      </div>
+      <div class="card">
+        <div class="k">Hits</div>
+        <div class="v mono" id="hitsOut">0</div>
+        <div class="small">count</div>
+      </div>
+      <div class="card">
+        <div class="k">Blocking circle radius</div>
+        <div class="v mono" id="rOut">—</div>
+        <div class="small">mRad</div>
+      </div>
+      <div class="card">
+        <div class="k">STD (Traverse / Elevation)</div>
+        <div class="v mono" id="stdXYOut">—</div>
+        <div class="small">mRad</div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="k">Aim → Center offset</div>
+        <div class="v mono" id="aimOffOut">—</div>
+        <div class="small">mRad</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Canvas</h2>
+    <div class="canvasWrap">
+      <canvas id="c"></canvas>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="hint">
+        Current stage: <span class="mono" id="stageOut">Scale</span>
+        &nbsp;•&nbsp; Clicks: <span class="mono" id="clickHint">Pick 2 scale points</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/sweetalert2@11.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
