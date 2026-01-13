@@ -5,6 +5,9 @@
 
   const hitColorInput = document.getElementById('hitColor');
   const hitAlphaInput = document.getElementById('hitAlpha');
+  const decreaseAnnotationBtn = document.getElementById('decreaseAnnotationBtn');
+  const increaseAnnotationBtn = document.getElementById('increaseAnnotationBtn');
+  const annotationScaleDisplay = document.getElementById('annotationScaleDisplay');
 
   const realDistM = document.getElementById('realDistM');
   const rangeM = document.getElementById('rangeM');
@@ -52,7 +55,8 @@
       aimOffset: { x: 10, y: 10 }
     },
     draggingLabel: null,
-    dragStart: null
+    dragStart: null,
+    annotationScale: 1.0
   };
 
   window.about = function(){
@@ -168,6 +172,8 @@
     exportBtn.disabled = !(state.img && state.hits.length > 0);
     exportCsvBtn.disabled = !(state.img && state.hits.length > 0);
 
+    annotationScaleDisplay.textContent = `${state.annotationScale.toFixed(1)}×`;
+
     scaleOut.textContent = state.mradPerPx ? fmt(state.mradPerPx, 6) : '—';
     hitsOut.textContent = String(state.hits.length);
 
@@ -211,30 +217,34 @@
   }
 
   function drawCross(x,y, size=10) {
+    const s = size * state.annotationScale;
     ctx.beginPath();
-    ctx.moveTo(x-size, y); ctx.lineTo(x+size, y);
-    ctx.moveTo(x, y-size); ctx.lineTo(x, y+size);
+    ctx.moveTo(x-s, y); ctx.lineTo(x+s, y);
+    ctx.moveTo(x, y-s); ctx.lineTo(x, y+s);
     ctx.stroke();
   }
 
   function drawPoint(x,y, r=4) {
+    const radius = r * state.annotationScale;
     ctx.beginPath();
-    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.arc(x,y,radius,0,Math.PI*2);
     ctx.fill();
   }
 
   function drawLabel(text, x, y, bg='rgba(0,0,0,0.55)') {
     ctx.save();
-    ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    const fontSize = Math.round(16 * state.annotationScale);
+    ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
     ctx.textBaseline = 'top';
-    const pad = 5;
+    const pad = Math.round(5 * state.annotationScale);
+    const h = Math.round(20 * state.annotationScale);
     const w = ctx.measureText(text).width;
     ctx.fillStyle = bg;
-    ctx.fillRect(x, y, w + pad*2, 20 + pad*2);
+    ctx.fillRect(x, y, w + pad*2, h + pad*2);
     ctx.fillStyle = 'white';
     ctx.fillText(text, x + pad, y + pad);
     ctx.restore();
-    return { x, y, w: w + pad*2, h: 20 + pad*2 };
+    return { x, y, w: w + pad*2, h: h + pad*2 };
   }
 
   function isPointInLabel(point, labelBounds) {
@@ -251,7 +261,7 @@
     if (L < 1e-6) return;
 
     const ux = dx / L, uy = dy / L;
-    const headLen = Math.min(18, 0.18 * L);
+    const headLen = Math.min(18 * state.annotationScale, 0.18 * L);
     const headW = headLen * 0.6;
 
     // end point for shaft (so arrowhead doesn't overshoot)
@@ -260,7 +270,7 @@
     ctx.save();
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = lineWidth;
+    ctx.lineWidth = lineWidth * state.annotationScale;
 
     // shaft
     ctx.beginPath();
@@ -294,8 +304,9 @@
       ctx.fillStyle = '#0a1020';
       ctx.fillRect(0,0,canvas.width||800,canvas.height||500);
       ctx.fillStyle = 'rgba(255,255,255,.65)';
-      ctx.font = '16px system-ui';
-      ctx.fillText('Load an image to begin.', 20, 40);
+      const fontSize = Math.round(16 * state.annotationScale);
+      ctx.font = `${fontSize}px system-ui`;
+      ctx.fillText('Load an image to begin.', 20 * state.annotationScale, 40 * state.annotationScale);
       updateUI();
       return;
     }
@@ -305,13 +316,14 @@
     // Scale points in blue
     if (state.scalePts.length > 0) {
       ctx.save();
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3 * state.annotationScale;
       ctx.strokeStyle = BLUE_STROKE;
       ctx.fillStyle = BLUE_FILL;
 
+      const offset = 8 * state.annotationScale;
       state.scalePts.forEach((p,i)=>{
         drawPoint(p.x,p.y,5);
-        drawLabel(`S${i+1}`, p.x+8, p.y+8);
+        drawLabel(`S${i+1}`, p.x+offset, p.y+offset);
       });
 
       if (state.scalePts.length === 2) {
@@ -321,7 +333,7 @@
         const px = dist(a,b);
         let txt = `${fmt(px,1)} px`;
         if (state.mradPerPx) txt = `${fmt(px*state.mradPerPx,3)} mRad`;
-        drawLabel(txt, (a.x+b.x)/2 + 8, (a.y+b.y)/2 + 8);
+        drawLabel(txt, (a.x+b.x)/2 + offset, (a.y+b.y)/2 + offset);
       }
       ctx.restore();
     }
@@ -332,10 +344,11 @@
     // Aim point cross
     if (state.aimPt) {
       ctx.save();
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 4 * state.annotationScale;
       ctx.strokeStyle = O_STROKE;
       drawCross(state.aimPt.x, state.aimPt.y, 16);
-      drawLabel('Aim', state.aimPt.x + 18, state.aimPt.y + 18);
+      const aimOffset = 18 * state.annotationScale;
+      drawLabel('Aim', state.aimPt.x + aimOffset, state.aimPt.y + aimOffset);
       ctx.restore();
     }
 
@@ -344,15 +357,15 @@
     // Aim offset arrow + label (requires aim + hits)
     if (stats && state.aimPt) {
       // Arrow Aim -> Center
-      drawArrow(state.aimPt, stats.mean, O_STROKE, 4);
+      drawArrow(state.aimPt, stats.mean, O_STROKE, 4 * state.annotationScale);
 
       // Distance label at mid point (mRad)
       if (state.mradPerPx) {
         const mid = { x: (state.aimPt.x + stats.mean.x)/2, y: (state.aimPt.y + stats.mean.y)/2 };
         const offMrad = dist(state.aimPt, stats.mean) * state.mradPerPx;
         const aimOffsetLabelPos = {
-          x: mid.x + state.labelOffsets.aimOffset.x,
-          y: mid.y + state.labelOffsets.aimOffset.y
+          x: mid.x + state.labelOffsets.aimOffset.x * state.annotationScale,
+          y: mid.y + state.labelOffsets.aimOffset.y * state.annotationScale
         };
         const aimOffsetLabelBounds = drawLabel(`Aim→Center = ${fmt(offMrad,3)} mRad`, 
           aimOffsetLabelPos.x, aimOffsetLabelPos.y);
@@ -368,24 +381,27 @@
       ctx.fillStyle = O_FILL;
 
       state.hits.forEach((p,i)=>{
-        ctx.beginPath(); ctx.arc(p.x,p.y,8,0,Math.PI*2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(p.x,p.y,3.5,0,Math.PI*2); ctx.fill();
-        drawLabel(String(i+1), p.x+10, p.y-10);
+        const hitRadius = 8 * state.annotationScale;
+        const hitFillRadius = 3.5 * state.annotationScale;
+        const hitLabelOffset = 10 * state.annotationScale;
+        ctx.beginPath(); ctx.arc(p.x,p.y,hitRadius,0,Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(p.x,p.y,hitFillRadius,0,Math.PI*2); ctx.fill();
+        drawLabel(String(i+1), p.x+hitLabelOffset, p.y-hitLabelOffset);
       });
 
       if (stats) {
         // center
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 4 * state.annotationScale;
         drawCross(stats.mean.x, stats.mean.y, 14);
         const centerLabelPos = {
-          x: stats.mean.x + state.labelOffsets.center.x,
-          y: stats.mean.y + state.labelOffsets.center.y
+          x: stats.mean.x + state.labelOffsets.center.x * state.annotationScale,
+          y: stats.mean.y + state.labelOffsets.center.y * state.annotationScale
         };
         const centerLabelBounds = drawLabel('Center', centerLabelPos.x, centerLabelPos.y);
         state.labelBounds.center = { ...centerLabelBounds, anchor: stats.mean };
 
         // blocking circle
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * state.annotationScale;
         ctx.beginPath();
         ctx.arc(stats.mean.x, stats.mean.y, stats.rMaxPx, 0, Math.PI*2);
         ctx.stroke();
@@ -410,19 +426,19 @@
           const stdEl = stats.stdY * state.mradPerPx;
 
           const labelAnchor = { x: stats.mean.x + stats.rMaxPx, y: stats.mean.y };
-          const lx = labelAnchor.x + state.labelOffsets.radius.x;
-          const ly = labelAnchor.y + state.labelOffsets.radius.y;
+          const lx = labelAnchor.x + state.labelOffsets.radius.x * state.annotationScale;
+          const ly = labelAnchor.y + state.labelOffsets.radius.y * state.annotationScale;
 
           const radiusLabelBounds = drawLabel(`R = ${fmt(rMrad,3)} mRad`, lx, ly);
           state.labelBounds.radius = { ...radiusLabelBounds, anchor: labelAnchor };
 
           // stdTr and stdEl use the same x as radius (they're grouped), but have their own y offsets
           const stdTrLabelBounds = drawLabel(`STD TR = ${fmt(stdTr,3)} mRad`, 
-            lx, ly + state.labelOffsets.stdTr.y);
+            lx, ly + state.labelOffsets.stdTr.y * state.annotationScale);
           state.labelBounds.stdTr = { ...stdTrLabelBounds, anchor: labelAnchor };
 
           const stdElLabelBounds = drawLabel(`STD EL = ${fmt(stdEl,3)} mRad`, 
-            lx, ly + state.labelOffsets.stdEl.y);
+            lx, ly + state.labelOffsets.stdEl.y * state.annotationScale);
           state.labelBounds.stdEl = { ...stdElLabelBounds, anchor: labelAnchor };
         }
       }
@@ -511,9 +527,15 @@
           const dx = p.x - state.dragStart.x;
           const dy = p.y - state.dragStart.y;
           
+          // Convert current scaled offset to base units, then add the raw pixel movement
+          // Offsets are stored in base units (scale 1.0), so divide by scale to convert back
+          const currentBaseX = (radiusLabel.x - radiusLabel.anchor.x) / state.annotationScale;
+          const currentBaseY = (radiusLabel.y - radiusLabel.anchor.y) / state.annotationScale;
+          
           // Update the radius offset (x and y) - this moves the whole group
-          state.labelOffsets.radius.x = (radiusLabel.x - radiusLabel.anchor.x) + dx;
-          state.labelOffsets.radius.y = (radiusLabel.y - radiusLabel.anchor.y) + dy;
+          // dx/dy are in canvas pixels, convert to base units
+          state.labelOffsets.radius.x = currentBaseX + (dx / state.annotationScale);
+          state.labelOffsets.radius.y = currentBaseY + (dy / state.annotationScale);
           
           // stdTr and stdEl maintain their relative y offsets (x is always same as radius)
           // Their x offsets are not used - they always align with radius.x
@@ -528,9 +550,15 @@
           const dx = p.x - state.dragStart.x;
           const dy = p.y - state.dragStart.y;
           
+          // Convert current scaled offset to base units, then add the raw pixel movement
+          // Offsets are stored in base units (scale 1.0), so divide by scale to convert back
+          const currentBaseX = (label.x - label.anchor.x) / state.annotationScale;
+          const currentBaseY = (label.y - label.anchor.y) / state.annotationScale;
+          
           // Update the offset
-          state.labelOffsets[state.draggingLabel].x = (label.x - label.anchor.x) + dx;
-          state.labelOffsets[state.draggingLabel].y = (label.y - label.anchor.y) + dy;
+          // dx/dy are in canvas pixels, convert to base units
+          state.labelOffsets[state.draggingLabel].x = currentBaseX + (dx / state.annotationScale);
+          state.labelOffsets[state.draggingLabel].y = currentBaseY + (dy / state.annotationScale);
           
           state.dragStart = p;
           redraw();
@@ -558,6 +586,19 @@
   // Color changes should redraw immediately
   hitColorInput.addEventListener('input', redraw);
   hitAlphaInput.addEventListener('input', redraw);
+
+  // Annotation scale controls
+  decreaseAnnotationBtn.addEventListener('click', () => {
+    state.annotationScale = Math.max(0.5, state.annotationScale - 0.1);
+    updateUI();
+    redraw();
+  });
+
+  increaseAnnotationBtn.addEventListener('click', () => {
+    state.annotationScale = Math.min(3.0, state.annotationScale + 0.1);
+    updateUI();
+    redraw();
+  });
 
   // Keyboard shortcut: S cycles stages (only if allowed)
   window.addEventListener('keydown', (e) => {
