@@ -347,8 +347,6 @@
       ctx.lineWidth = 4 * state.annotationScale;
       ctx.strokeStyle = O_STROKE;
       drawCross(state.aimPt.x, state.aimPt.y, 16);
-      const aimOffset = 18 * state.annotationScale;
-      drawLabel('Aim', state.aimPt.x + aimOffset, state.aimPt.y + aimOffset);
       ctx.restore();
     }
 
@@ -393,12 +391,6 @@
         // center
         ctx.lineWidth = 4 * state.annotationScale;
         drawCross(stats.mean.x, stats.mean.y, 14);
-        const centerLabelPos = {
-          x: stats.mean.x + state.labelOffsets.center.x * state.annotationScale,
-          y: stats.mean.y + state.labelOffsets.center.y * state.annotationScale
-        };
-        const centerLabelBounds = drawLabel('Center', centerLabelPos.x, centerLabelPos.y);
-        state.labelBounds.center = { ...centerLabelBounds, anchor: stats.mean };
 
         // blocking circle
         ctx.lineWidth = 3 * state.annotationScale;
@@ -452,7 +444,7 @@
   // Check if click is on a draggable label
   function getLabelAtPoint(point) {
     if (!state.labelBounds) return null;
-    const labels = ['center', 'radius', 'stdTr', 'stdEl', 'aimOffset'];
+    const labels = ['radius', 'stdTr', 'stdEl', 'aimOffset'];
     for (const labelKey of labels) {
       if (state.labelBounds[labelKey] && isPointInLabel(point, state.labelBounds[labelKey])) {
         // Group radius, stdTr, and stdEl together
