@@ -294,6 +294,37 @@
     ctx.restore();
   }
 
+  function drawDragDropIcon(x, y, size = 32) {
+    const s = size * state.annotationScale;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.70)';
+    ctx.lineWidth = 2 * state.annotationScale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Tray
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.6, y + s * 0.4);
+    ctx.lineTo(x + s * 0.6, y + s * 0.4);
+    ctx.lineTo(x + s * 0.4, y + s * 0.75);
+    ctx.lineTo(x - s * 0.4, y + s * 0.75);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Arrow
+    ctx.beginPath();
+    ctx.moveTo(x, y - s * 0.8);
+    ctx.lineTo(x, y + s * 0.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.2, y - s * 0.1);
+    ctx.lineTo(x, y + s * 0.1);
+    ctx.lineTo(x + s * 0.2, y - s * 0.1);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   function redraw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     
@@ -303,10 +334,19 @@
     if (!state.img) {
       ctx.fillStyle = '#0a1020';
       ctx.fillRect(0,0,canvas.width||800,canvas.height||500);
-      ctx.fillStyle = 'rgba(255,255,255,.65)';
-      const fontSize = Math.round(16 * state.annotationScale);
+
+      const centerX = (canvas.width || 800) / 2;
+      const centerY = (canvas.height || 500) / 2;
+      drawDragDropIcon(centerX, centerY - 30 * state.annotationScale, 34);
+
+      ctx.fillStyle = 'rgba(255,255,255,.78)';
+      const fontSize = Math.round(22 * state.annotationScale);
       ctx.font = `${fontSize}px system-ui`;
-      ctx.fillText('Load an image to begin.', 20 * state.annotationScale, 40 * state.annotationScale);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('Load image or drag and drop here to begin.', centerX, centerY + 10 * state.annotationScale);
+      ctx.textAlign = 'start';
+      ctx.textBaseline = 'alphabetic';
       updateUI();
       return;
     }
@@ -606,10 +646,11 @@
     }
   });
 
-  fileInput.addEventListener('change', () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (!f) return;
-    const url = URL.createObjectURL(f);
+  function loadImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      return false;
+    }
+    const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       state.img = img;
@@ -623,6 +664,44 @@
       URL.revokeObjectURL(url);
     };
     img.src = url;
+    return true;
+  }
+
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) loadImageFile(f);
+  });
+
+  // Drag and drop for canvas
+  const canvasWrap = document.querySelector('.canvasWrap');
+  
+  canvasWrap.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    canvasWrap.classList.add('drag-over');
+  });
+
+  canvasWrap.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    canvasWrap.classList.remove('drag-over');
+  });
+
+  canvasWrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    canvasWrap.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (loadImageFile(file)) {
+        // Also update the file input to reflect the dropped file
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInput.files = dataTransfer.files;
+      }
+    }
   });
 
   setScaleBtn.addEventListener('click', () => computeScale());
