@@ -191,7 +191,9 @@
 
     if (stats && state.mradPerPx && state.aimPt) {
       const offPx = dist(state.aimPt, stats.mean);
-      aimOffOut.textContent = fmt(offPx * state.mradPerPx, 3);
+      const dxMrad = (stats.mean.x - state.aimPt.x) * state.mradPerPx;
+      const dyMrad = (stats.mean.y - state.aimPt.y) * state.mradPerPx;
+      aimOffOut.innerHTML = `${fmt(offPx * state.mradPerPx, 3)}<br>ΔX(TR) = ${fmt(dxMrad,3)}<br>ΔY(EL) = ${fmt(dyMrad,3)}`;
     } else {
       aimOffOut.textContent = '—';
     }
@@ -401,13 +403,26 @@
       if (state.mradPerPx) {
         const mid = { x: (state.aimPt.x + stats.mean.x)/2, y: (state.aimPt.y + stats.mean.y)/2 };
         const offMrad = dist(state.aimPt, stats.mean) * state.mradPerPx;
+        const dxMrad = (stats.mean.x - state.aimPt.x) * state.mradPerPx;
+        const dyMrad = (stats.mean.y - state.aimPt.y) * state.mradPerPx;
         const aimOffsetLabelPos = {
           x: mid.x + state.labelOffsets.aimOffset.x * state.annotationScale,
           y: mid.y + state.labelOffsets.aimOffset.y * state.annotationScale
         };
-        const aimOffsetLabelBounds = drawLabel(`Aim→Center = ${fmt(offMrad,3)} mRad`, 
-          aimOffsetLabelPos.x, aimOffsetLabelPos.y);
-        state.labelBounds.aimOffset = { ...aimOffsetLabelBounds, anchor: mid };
+        const line1 = `Aim→Center = ${fmt(offMrad,3)} mRad`;
+        const line2 = `ΔX(TR) = ${fmt(dxMrad,3)} mRad`;
+        const line3 = `ΔY(EL) = ${fmt(dyMrad,3)} mRad`;
+        const lb1 = drawLabel(line1, aimOffsetLabelPos.x, aimOffsetLabelPos.y);
+        const lineH = lb1.h - 2;
+        const lb2 = drawLabel(line2, aimOffsetLabelPos.x, aimOffsetLabelPos.y + lineH);
+        const lb3 = drawLabel(line3, aimOffsetLabelPos.x, aimOffsetLabelPos.y + lineH * 2);
+        const combined = {
+          x: aimOffsetLabelPos.x,
+          y: aimOffsetLabelPos.y,
+          w: Math.max(lb1.w, lb2.w, lb3.w),
+          h: lb1.h + lineH * 2 + lb3.h
+        };
+        state.labelBounds.aimOffset = { ...combined, anchor: mid };
       }
     }
 
