@@ -2,6 +2,16 @@
   const fileInput = document.getElementById('file');
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
+  const canvasWrap = document.querySelector('.canvasWrap');
+
+  const cropBtn = document.getElementById('cropBtn');
+  const applyCropBtn = document.getElementById('applyCropBtn');
+  const cancelCropBtn = document.getElementById('cancelCropBtn');
+
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+  const zoomDisplay = document.getElementById('zoomDisplay');
 
   const hitColorInput = document.getElementById('hitColor');
   const hitAlphaInput = document.getElementById('hitAlpha');
@@ -56,7 +66,11 @@
     },
     draggingLabel: null,
     dragStart: null,
-    annotationScale: 1.0
+    annotationScale: 1.0,
+    cropMode: false,
+    cropRect: null,
+    cropDragStart: null,
+    viewZoom: 1.0,
   };
 
   window.about = function(){
@@ -133,7 +147,74 @@
     if (!state.img) return;
     canvas.width = state.img.naturalWidth || state.img.width;
     canvas.height = state.img.naturalHeight || state.img.height;
+    applyZoom();
     redraw();
+  }
+
+  function applyZoom() {
+    if (state.viewZoom <= 1.0) {
+      canvas.style.width = '';
+      canvas.style.height = '';
+      canvas.style.maxWidth = '';
+      canvas.style.maxHeight = '';
+      canvasWrap.style.overflow = '';
+      canvasWrap.style.alignItems = '';
+      canvasWrap.style.justifyContent = '';
+    } else {
+      const wrapW = canvasWrap.clientWidth;
+      const wrapH = canvasWrap.clientHeight;
+      const imgAspect = canvas.width / canvas.height;
+      const wrapAspect = wrapW / wrapH;
+      const baseW = imgAspect >= wrapAspect ? wrapW : wrapH * imgAspect;
+      canvas.style.width = Math.round(baseW * state.viewZoom) + 'px';
+      canvas.style.height = 'auto';
+      canvas.style.maxWidth = 'none';
+      canvas.style.maxHeight = 'none';
+      canvasWrap.style.overflow = 'auto';
+      canvasWrap.style.alignItems = 'flex-start';
+      canvasWrap.style.justifyContent = 'flex-start';
+    }
+    updateZoomDisplay();
+  }
+
+  function updateZoomDisplay() {
+    zoomDisplay.textContent = Math.round(state.viewZoom * 100) + '%';
+  }
+
+  function updateCropUI() {
+    const inCrop = state.cropMode;
+    cropBtn.textContent = inCrop ? 'Cropping…' : '✂ Crop image';
+    cropBtn.style.display = inCrop ? 'none' : '';
+    applyCropBtn.style.display = inCrop ? '' : 'none';
+    cancelCropBtn.style.display = inCrop ? '' : 'none';
+    applyCropBtn.disabled = !(state.cropRect && state.cropRect.w > 4 && state.cropRect.h > 4);
+  }
+
+  function applyCrop() {
+    if (!state.img || !state.cropRect) return;
+    const { x, y, w, h } = state.cropRect;
+    if (w < 5 || h < 5) return;
+    const tmp = document.createElement('canvas');
+    tmp.width = Math.round(w);
+    tmp.height = Math.round(h);
+    tmp.getContext('2d').drawImage(state.img, x, y, w, h, 0, 0, Math.round(w), Math.round(h));
+    const cropped = new Image();
+    cropped.onload = () => {
+      state.img = cropped;
+      state.cropMode = false;
+      state.cropRect = null;
+      state.cropDragStart = null;
+      state.scalePts = [];
+      state.aimPt = null;
+      state.hits = [];
+      state.mradPerPx = null;
+      state.viewZoom = 1.0;
+      setStage('scale');
+      resizeCanvasToImage();
+      updateUI();
+      updateCropUI();
+    };
+    cropped.src = tmp.toDataURL();
   }
 
   function computeStats() {
@@ -355,6 +436,45 @@
 
     ctx.drawImage(state.img, 0, 0, canvas.width, canvas.height);
 
+    // Crop overlay — drawn on top of image, skip all annotations
+    if (state.cropMode) {
+      if (state.cropRect && state.cropRect.w > 0 && state.cropRect.h > 0) {
+        const { x, y, w, h } = state.cropRect;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.52)';
+        ctx.fillRect(0, 0, canvas.width, y);
+        ctx.fillRect(0, y + h, canvas.width, canvas.height - y - h);
+        ctx.fillRect(0, y, x, h);
+        ctx.fillRect(x + w, y, canvas.width - x - w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2 * state.annotationScale;
+        ctx.setLineDash([6 * state.annotationScale, 3 * state.annotationScale]);
+        ctx.strokeRect(x, y, w, h);
+        // Corner handles
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'white';
+        const hs = 6 * state.annotationScale;
+        [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([cx,cy])=>{
+          ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
+        });
+        ctx.restore();
+      } else {
+        // No rect yet — hint text
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(255,255,255,.85)';
+        const sz = Math.round(20 * state.annotationScale);
+        ctx.font = `${sz}px system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Drag to select crop area', canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+      }
+      updateUI();
+      return;
+    }
+
     // Scale points in blue
     if (state.scalePts.length > 0) {
       ctx.save();
@@ -514,8 +634,17 @@
 
   canvas.addEventListener('mousedown', (evt) => {
     if (!state.img) return;
-    
+
     const p = canvasToImageXY(evt);
+
+    // Crop mode — start drawing crop rectangle
+    if (state.cropMode) {
+      state.cropDragStart = p;
+      state.cropRect = null;
+      updateCropUI();
+      return;
+    }
+
     const clickedLabel = getLabelAtPoint(p);
     
     if (clickedLabel) {
@@ -557,6 +686,20 @@
     if (!state.img) return;
     
     const p = canvasToImageXY(evt);
+
+    // Crop drag
+    if (state.cropMode) {
+      canvas.style.cursor = 'crosshair';
+      if (state.cropDragStart) {
+        const x = Math.max(0, Math.min(state.cropDragStart.x, p.x));
+        const y = Math.max(0, Math.min(state.cropDragStart.y, p.y));
+        const x2 = Math.min(canvas.width, Math.max(state.cropDragStart.x, p.x));
+        const y2 = Math.min(canvas.height, Math.max(state.cropDragStart.y, p.y));
+        state.cropRect = { x, y, w: x2 - x, h: y2 - y };
+        redraw();
+      }
+      return;
+    }
     
     // Update cursor when hovering over labels
     if (!state.draggingLabel) {
@@ -615,6 +758,11 @@
   });
 
   canvas.addEventListener('mouseup', (evt) => {
+    if (state.cropMode) {
+      state.cropDragStart = null;
+      updateCropUI();
+      return;
+    }
     if (state.draggingLabel) {
       state.draggingLabel = null;
       state.dragStart = null;
@@ -623,6 +771,11 @@
   });
 
   canvas.addEventListener('mouseleave', (evt) => {
+    if (state.cropMode) {
+      state.cropDragStart = null;
+      canvas.style.cursor = 'default';
+      return;
+    }
     if (state.draggingLabel) {
       state.draggingLabel = null;
       state.dragStart = null;
@@ -673,9 +826,15 @@
       state.aimPt = null;
       state.hits = [];
       state.mradPerPx = null;
+      state.cropMode = false;
+      state.cropRect = null;
+      state.cropDragStart = null;
+      state.viewZoom = 1.0;
       setStage('scale');
       resizeCanvasToImage();
       updateUI();
+      updateCropUI();
+      cropBtn.disabled = false;
       URL.revokeObjectURL(url);
     };
     img.src = url;
@@ -688,8 +847,6 @@
   });
 
   // Drag and drop for canvas
-  const canvasWrap = document.querySelector('.canvasWrap');
-  
   canvasWrap.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -863,9 +1020,55 @@
     exportToCSV();
   });
 
+  // Crop buttons
+  cropBtn.addEventListener('click', () => {
+    if (!state.img) return;
+    state.cropMode = true;
+    state.cropRect = null;
+    state.cropDragStart = null;
+    updateCropUI();
+    redraw();
+  });
+
+  applyCropBtn.addEventListener('click', () => applyCrop());
+
+  cancelCropBtn.addEventListener('click', () => {
+    state.cropMode = false;
+    state.cropRect = null;
+    state.cropDragStart = null;
+    updateCropUI();
+    redraw();
+  });
+
+  // Zoom buttons
+  zoomInBtn.addEventListener('click', () => {
+    state.viewZoom = Math.min(5.0, parseFloat((state.viewZoom + 0.25).toFixed(2)));
+    applyZoom();
+  });
+
+  zoomOutBtn.addEventListener('click', () => {
+    state.viewZoom = Math.max(0.5, parseFloat((state.viewZoom - 0.25).toFixed(2)));
+    applyZoom();
+  });
+
+  zoomResetBtn.addEventListener('click', () => {
+    state.viewZoom = 1.0;
+    applyZoom();
+  });
+
+  // Scroll wheel zoom on canvas
+  canvasWrap.addEventListener('wheel', (e) => {
+    if (!state.img) return;
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.15 : -0.15;
+    state.viewZoom = Math.max(0.5, Math.min(5.0, parseFloat((state.viewZoom + delta).toFixed(2))));
+    applyZoom();
+  }, { passive: false });
+
   // Init placeholder canvas size
   canvas.width = 1200;
   canvas.height = 800;
+  updateZoomDisplay();
   redraw();
 })();
 
