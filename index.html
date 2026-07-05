@@ -38,7 +38,7 @@
         <span class="pill" id="pillHits">3) Mark hits</span>
       </div>
     </div>
-    <div class="hint">
+    <div class="hint desktop-only">
       Tip: <span class="kbd">Ctrl</span>+Click in hit stage to undo last hit.
       <span class="kbd">S</span> cycles stages (when allowed).
     </div>
@@ -86,7 +86,7 @@
     <div class="divider"></div>
 
     <h2>Stage 1 — Set scale (mRad / pixel)</h2>
-    <div class="hint">
+    <div class="hint explain">
       Click <b>two points</b> on the picture, then enter the distance between them and the range.
       This sets <b>mRad per pixel</b>.
     </div>
@@ -111,7 +111,7 @@
     <div class="divider"></div>
 
     <h2>Stage 2 — Choose aim point</h2>
-    <div class="hint">
+    <div class="hint explain">
       Click once on the image to set the <b>aim point</b>.
       The app draws an <b>arrow</b> from Aim → Center (after you have hits).
     </div>
@@ -124,7 +124,7 @@
     <div class="divider"></div>
 
     <h2>Stage 3 — Mark hits</h2>
-    <div class="hint">
+    <div class="hint explain">
       Click to add hits. The app computes:
       <ul>
         <li>Center of hits (mean X/Y)</li>
@@ -174,6 +174,11 @@
     <h2>Canvas</h2>
     <div class="canvasWrap">
       <canvas id="c"></canvas>
+    </div>
+    <div class="mobile-toolbar" id="mobileToolbar">
+      <button id="mbUndo">↩ Undo</button>
+      <span id="mbStageLabel" class="mb-stage">Scale</span>
+      <button id="mbNext" class="primary">Next →</button>
     </div>
     <div class="row" style="margin-top:8px;">
       <span class="hint" style="margin-right:auto; align-self:center;">Zoom:</span>

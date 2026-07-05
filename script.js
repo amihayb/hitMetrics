@@ -13,6 +13,15 @@
   const zoomResetBtn = document.getElementById('zoomResetBtn');
   const zoomDisplay = document.getElementById('zoomDisplay');
 
+  const mbUndo = document.getElementById('mbUndo');
+  const mbNext = document.getElementById('mbNext');
+  const mbStageLabel = document.getElementById('mbStageLabel');
+
+  // On mobile, offer camera capture; desktop browsers don't handle this attribute reliably
+  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    fileInput.setAttribute('capture', 'environment');
+  }
+
   const hitColorInput = document.getElementById('hitColor');
   const hitAlphaInput = document.getElementById('hitAlpha');
   const decreaseAnnotationBtn = document.getElementById('decreaseAnnotationBtn');
@@ -123,6 +132,7 @@
       (s === 'aim') ? 'Click once to set aim point' :
       'Click to add hits';
 
+    updateMobileToolbar();
     redraw();
   }
 
@@ -190,8 +200,32 @@
     applyCropBtn.disabled = !(state.cropRect && state.cropRect.w > 4 && state.cropRect.h > 4);
   }
 
-  function applyCrop() {
-    if (!state.img || !state.cropRect) return;
+  function updateMobileToolbar() {
+    const s = state.stage;
+    const stageNames = { scale: 'Scale', aim: 'Aim point', hits: 'Mark hits' };
+    mbStageLabel.textContent = stageNames[s] || s;
+
+    if (s === 'scale') {
+      mbUndo.disabled = state.scalePts.length === 0;
+    } else if (s === 'hits') {
+      mbUndo.disabled = state.hits.length === 0;
+    } else {
+      mbUndo.disabled = true;
+    }
+
+    if (s === 'scale') {
+      mbNext.disabled = !(state.scalePts.length === 2 && state.img);
+      mbNext.textContent = 'Next →';
+    } else if (s === 'aim') {
+      mbNext.disabled = !(state.mradPerPx && state.aimPt && state.img);
+      mbNext.textContent = 'Next →';
+    } else {
+      mbNext.disabled = true;
+      mbNext.textContent = 'Done';
+    }
+  }
+
+  function applyCrop() {    if (!state.img || !state.cropRect) return;
     const { x, y, w, h } = state.cropRect;
     if (w < 5 || h < 5) return;
     const tmp = document.createElement('canvas');
@@ -278,6 +312,7 @@
     } else {
       aimOffOut.textContent = '—';
     }
+    updateMobileToolbar();
   }
 
   function computeScale() {
@@ -299,7 +334,7 @@
     redraw();
   }
 
-  function drawCross(x,y, size=10) {
+  function drawCross(x,y, size=20) {
     const s = size * state.annotationScale;
     ctx.beginPath();
     ctx.moveTo(x-s, y); ctx.lineTo(x+s, y);
@@ -307,7 +342,7 @@
     ctx.stroke();
   }
 
-  function drawPoint(x,y, r=4) {
+  function drawPoint(x,y, r=8) {
     const radius = r * state.annotationScale;
     ctx.beginPath();
     ctx.arc(x,y,radius,0,Math.PI*2);
@@ -316,11 +351,11 @@
 
   function drawLabel(text, x, y, bg='rgba(0,0,0,0.55)') {
     ctx.save();
-    const fontSize = Math.round(16 * state.annotationScale);
+    const fontSize = Math.round(32 * state.annotationScale);
     ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
     ctx.textBaseline = 'top';
-    const pad = Math.round(5 * state.annotationScale);
-    const h = Math.round(20 * state.annotationScale);
+    const pad = Math.round(10 * state.annotationScale);
+    const h = Math.round(40 * state.annotationScale);
     const w = ctx.measureText(text).width;
     ctx.fillStyle = bg;
     ctx.fillRect(x, y, w + pad*2, h + pad*2);
@@ -344,7 +379,7 @@
     if (L < 1e-6) return;
 
     const ux = dx / L, uy = dy / L;
-    const headLen = Math.min(18 * state.annotationScale, 0.18 * L);
+    const headLen = Math.min(36 * state.annotationScale, 0.18 * L);
     const headW = headLen * 0.6;
 
     // end point for shaft (so arrowhead doesn't overshoot)
@@ -420,14 +455,14 @@
 
       const centerX = (canvas.width || 800) / 2;
       const centerY = (canvas.height || 500) / 2;
-      drawDragDropIcon(centerX, centerY - 30 * state.annotationScale, 34);
+      drawDragDropIcon(centerX, centerY - 60 * state.annotationScale, 34);
 
       ctx.fillStyle = 'rgba(255,255,255,.78)';
-      const fontSize = Math.round(22 * state.annotationScale);
+      const fontSize = Math.round(44 * state.annotationScale);
       ctx.font = `${fontSize}px system-ui`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText('Load image or drag and drop here to begin.', centerX, centerY + 10 * state.annotationScale);
+      ctx.fillText('Load image or drag and drop here to begin.', centerX, centerY + 20 * state.annotationScale);
       ctx.textAlign = 'start';
       ctx.textBaseline = 'alphabetic';
       updateUI();
@@ -448,12 +483,12 @@
         ctx.fillRect(x + w, y, canvas.width - x - w, h);
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2 * state.annotationScale;
-        ctx.setLineDash([6 * state.annotationScale, 3 * state.annotationScale]);
+        ctx.setLineDash([12 * state.annotationScale, 6 * state.annotationScale]);
         ctx.strokeRect(x, y, w, h);
         // Corner handles
         ctx.setLineDash([]);
         ctx.fillStyle = 'white';
-        const hs = 6 * state.annotationScale;
+        const hs = 12 * state.annotationScale;
         [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([cx,cy])=>{
           ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
         });
@@ -464,7 +499,7 @@
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'rgba(255,255,255,.85)';
-        const sz = Math.round(20 * state.annotationScale);
+        const sz = Math.round(40 * state.annotationScale);
         ctx.font = `${sz}px system-ui`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -478,13 +513,13 @@
     // Scale points in blue
     if (state.scalePts.length > 0) {
       ctx.save();
-      ctx.lineWidth = 3 * state.annotationScale;
+      ctx.lineWidth = 6 * state.annotationScale;
       ctx.strokeStyle = BLUE_STROKE;
       ctx.fillStyle = BLUE_FILL;
 
-      const offset = 8 * state.annotationScale;
+      const offset = 16 * state.annotationScale;
       state.scalePts.forEach((p,i)=>{
-        drawPoint(p.x,p.y,5);
+        drawPoint(p.x,p.y,10);
         drawLabel(`S${i+1}`, p.x+offset, p.y+offset);
       });
 
@@ -506,9 +541,9 @@
     // Aim point cross
     if (state.aimPt) {
       ctx.save();
-      ctx.lineWidth = 4 * state.annotationScale;
+      ctx.lineWidth = 8 * state.annotationScale;
       ctx.strokeStyle = O_STROKE;
-      drawCross(state.aimPt.x, state.aimPt.y, 16);
+      drawCross(state.aimPt.x, state.aimPt.y, 32);
       ctx.restore();
     }
 
@@ -517,7 +552,7 @@
     // Aim offset arrow + label (requires aim + hits)
     if (stats && state.aimPt) {
       // Arrow Aim -> Center
-      drawArrow(state.aimPt, stats.mean, O_STROKE, 4 * state.annotationScale);
+      drawArrow(state.aimPt, stats.mean, O_STROKE, 8 * state.annotationScale);
 
       // Distance label at mid point (mRad)
       if (state.mradPerPx) {
@@ -549,14 +584,14 @@
     // Hits + circle + center in chosen color
     if (state.hits.length > 0) {
       ctx.save();
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 6;
       ctx.strokeStyle = O_STROKE;
       ctx.fillStyle = O_FILL;
 
       state.hits.forEach((p,i)=>{
-        const hitRadius = 8 * state.annotationScale;
-        const hitFillRadius = 3.5 * state.annotationScale;
-        const hitLabelOffset = 10 * state.annotationScale;
+        const hitRadius = 16 * state.annotationScale;
+        const hitFillRadius = 7 * state.annotationScale;
+        const hitLabelOffset = 20 * state.annotationScale;
         ctx.beginPath(); ctx.arc(p.x,p.y,hitRadius,0,Math.PI*2); ctx.stroke();
         ctx.beginPath(); ctx.arc(p.x,p.y,hitFillRadius,0,Math.PI*2); ctx.fill();
         drawLabel(String(i+1), p.x+hitLabelOffset, p.y-hitLabelOffset);
@@ -564,11 +599,11 @@
 
       if (stats) {
         // center
-        ctx.lineWidth = 4 * state.annotationScale;
-        drawCross(stats.mean.x, stats.mean.y, 14);
+        ctx.lineWidth = 8 * state.annotationScale;
+        drawCross(stats.mean.x, stats.mean.y, 28);
 
         // blocking circle
-        ctx.lineWidth = 3 * state.annotationScale;
+        ctx.lineWidth = 6 * state.annotationScale;
         ctx.beginPath();
         ctx.arc(stats.mean.x, stats.mean.y, stats.rMaxPx, 0, Math.PI*2);
         ctx.stroke();
@@ -599,13 +634,11 @@
           const radiusLabelBounds = drawLabel(`R = ${fmt(rMrad,3)} mRad`, lx, ly);
           state.labelBounds.radius = { ...radiusLabelBounds, anchor: labelAnchor };
 
-          // stdTr and stdEl use the same x as radius (they're grouped), but have their own y offsets
-          const stdTrLabelBounds = drawLabel(`STD TR = ${fmt(stdTr,3)} mRad`, 
-            lx, ly + state.labelOffsets.stdTr.y * state.annotationScale);
+          const lineH = radiusLabelBounds.h;
+          const stdTrLabelBounds = drawLabel(`STD TR = ${fmt(stdTr,3)} mRad`, lx, ly + lineH);
           state.labelBounds.stdTr = { ...stdTrLabelBounds, anchor: labelAnchor };
 
-          const stdElLabelBounds = drawLabel(`STD EL = ${fmt(stdEl,3)} mRad`, 
-            lx, ly + state.labelOffsets.stdEl.y * state.annotationScale);
+          const stdElLabelBounds = drawLabel(`STD EL = ${fmt(stdEl,3)} mRad`, lx, ly + lineH * 2);
           state.labelBounds.stdEl = { ...stdElLabelBounds, anchor: labelAnchor };
         }
       }
@@ -1065,10 +1098,82 @@
     applyZoom();
   }, { passive: false });
 
+  // ── Touch support ─────────────────────────────────────────────────────
+  function forwardTouch(e, type) {
+    const t = e.touches[0] || e.changedTouches[0];
+    if (!t) return;
+    canvas.dispatchEvent(new MouseEvent(type, {
+      clientX: t.clientX,
+      clientY: t.clientY,
+      bubbles: true,
+      ctrlKey: e.ctrlKey,
+    }));
+  }
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) forwardTouch(e, 'mousedown');
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    forwardTouch(e, 'mouseup');
+    lastPinchDist = null;
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    forwardTouch(e, 'mouseleave');
+    lastPinchDist = null;
+  }, { passive: false });
+
+  let lastPinchDist = null;
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      // Two-finger pinch → zoom
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (lastPinchDist !== null) {
+        state.viewZoom = Math.max(0.5, Math.min(5.0,
+          parseFloat((state.viewZoom * (d / lastPinchDist)).toFixed(2))
+        ));
+        applyZoom();
+      }
+      lastPinchDist = d;
+    } else {
+      lastPinchDist = null;
+      forwardTouch(e, 'mousemove');
+    }
+  }, { passive: false });
+
+  // ── Mobile quick-action toolbar buttons ───────────────────────────────
+  mbUndo.addEventListener('click', () => {
+    if (state.stage === 'scale' && state.scalePts.length > 0) {
+      state.scalePts.pop();
+    } else if (state.stage === 'hits' && state.hits.length > 0) {
+      state.hits.pop();
+    }
+    updateUI();
+    redraw();
+  });
+
+  mbNext.addEventListener('click', () => {
+    if (state.stage === 'scale') {
+      computeScale();
+      if (state.mradPerPx) setStage('aim');
+    } else if (state.stage === 'aim' && state.aimPt) {
+      setStage('hits');
+    }
+  });
+
   // Init placeholder canvas size
   canvas.width = 1200;
   canvas.height = 800;
   updateZoomDisplay();
+  updateMobileToolbar();
   redraw();
 })();
 

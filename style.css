@@ -129,6 +129,56 @@ canvas {
   height: auto;
   background: #050a14;
   border-radius: 10px;
+  touch-action: none;
+}
+
+/* Mobile quick-action toolbar — hidden on desktop */
+.mobile-toolbar {
+  display: none;
+}
+
+/* ── Mobile (≤640 px) ────────────────────────────────── */
+@media (max-width: 640px) {
+  .wrap { grid-template-columns: 1fr; padding: 8px; gap: 10px; }
+
+  /* Canvas panel on top */
+  .panel:last-child { order: -1; }
+
+  .canvasWrap { height: 50vh; min-height: 240px; }
+
+  /* Hide explanatory text and desktop-only keyboard hints */
+  .explain { display: none; }
+  .desktop-only { display: none; }
+
+  /* Header compact */
+  .app-header { padding: 8px 12px; gap: 8px; }
+  .app-header h1 { font-size: 13px; }
+  .rafael-logo { height: 30px; }
+  .blau-logo   { height: 26px; }
+
+  /* Touch-friendly tap targets */
+  button { min-height: 44px; padding: 10px 12px; font-size: 14px; }
+  input[type="file"] { font-size: 14px; }
+  input[type="file"]::file-selector-button { min-height: 44px; padding: 10px 14px; }
+  input[type="number"] { min-height: 44px; font-size: 15px; }
+
+  /* Quick-action toolbar */
+  .mobile-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 4px;
+  }
+  .mb-stage {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    text-align: center;
+    flex: 1;
+  }
+  .mobile-toolbar button { flex-shrink: 0; min-width: 90px; }
 }
 
 .stats {
