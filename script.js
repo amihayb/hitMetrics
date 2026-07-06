@@ -510,8 +510,8 @@
       return;
     }
 
-    // Scale points in blue
-    if (state.scalePts.length > 0) {
+    // Scale points in blue — only shown during scale stage
+    if (state.scalePts.length > 0 && state.stage === 'scale') {
       ctx.save();
       ctx.lineWidth = 6 * state.annotationScale;
       ctx.strokeStyle = BLUE_STROKE;
