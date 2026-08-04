@@ -145,6 +145,18 @@ canvas {
   .panel:last-child { order: -1; }
 
   .canvasWrap { height: 50vh; min-height: 240px; }
+  .canvasWrap.no-image { cursor: pointer; }
+  .canvasWrap.no-image::after {
+    content: '📂 Tap to load image';
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: rgba(255,255,255,.45);
+    pointer-events: none;
+    white-space: nowrap;
+  }
 
   /* Hide explanatory text and desktop-only keyboard hints */
   .explain { display: none; }

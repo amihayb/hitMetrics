@@ -17,10 +17,13 @@
   const mbNext = document.getElementById('mbNext');
   const mbStageLabel = document.getElementById('mbStageLabel');
 
-  // On mobile, offer camera capture; desktop browsers don't handle this attribute reliably
-  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    fileInput.setAttribute('capture', 'environment');
-  }
+  // Mobile: tap the empty canvas to open the file picker
+  canvasWrap.addEventListener('touchend', (e) => {
+    if (!state.img && e.changedTouches.length === 1) {
+      e.preventDefault();
+      fileInput.click();
+    }
+  }, { passive: false });
 
   const hitColorInput = document.getElementById('hitColor');
   const hitAlphaInput = document.getElementById('hitAlpha');
@@ -274,6 +277,7 @@
   }
 
   function updateUI() {
+    canvasWrap.classList.toggle('no-image', !state.img);
     setScaleBtn.disabled = !(state.scalePts.length === 2 && state.img);
     resetScaleBtn.disabled = !(state.scalePts.length > 0);
 
@@ -1174,6 +1178,7 @@
   canvas.height = 800;
   updateZoomDisplay();
   updateMobileToolbar();
+  updateUI();
   redraw();
 })();
 
